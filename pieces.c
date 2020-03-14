@@ -7,6 +7,8 @@
 #define EPSILON 0.001
 
 const vec3 BISHOP_POS = vec3(0, 0, 20);
+const vec3 KING_POS = vec3(-5, 0, 20);
+
 
 // Signed distance functions defined here:
 float sphere_sdf( vec3 p, float r)
@@ -163,6 +165,12 @@ float sdCone( vec3 p, vec2 c )
     //float h = clamp( 0.5 + 0.5*(d2-d1)/k, 0.0, 1.0 );
     //return mix( d2, d1, h ) - k*h*(1.0-h); }
 
+float sdRoundBox( vec3 p, vec3 b, float r )
+{
+  vec3 q = abs(p) - b;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+}
+
 
 float bishop_base(vec3 p){
     float base = rounded_cylinder_sdf(p, .55, .15, .15);
@@ -193,6 +201,27 @@ float bishop_tip(vec3 p){
     
 }
 
+float king_shaft(vec3 p){
+    float ring = rounded_cylinder_sdf(p - vec3(0,3.1,0), .35,.005,.1);
+    float ring2 = rounded_cylinder_sdf(p - vec3(0,3.3,0), .25,.003,.08);
+    float ring3 = rounded_cylinder_sdf(p - vec3(0,3.5,0), .2,.003,.06);
+    float shaft_tip = opUnion(opUnion(ring, ring2), ring3);   
+    
+    float cone = rounded_cone_sdf(p, .4,.1, 4.5);
+    float ring4 = rounded_cylinder_sdf(p - vec3(0,0.4,0), .25,.003,.08);
+    float shaft_base = opUnion(opSmoothUnion(cone, ring4, 0.3), ring4);
+    return opSmoothUnion(shaft_base, shaft_tip,0.5);
+}
+
+float king_tip(vec3 p){
+    float head = sdCappedCone(p,0.5, 0.1,0.55,vec3(0.,0.,0.));
+    float h_rect1 = sdRoundBox(p-vec3(0.,0.8,0.), vec3(0.1,0.4,0.05),0.01);
+    float h_rect2 = sdRoundBox(p-vec3(0., 0.9,0.), vec3(0.3,0.1,0.05),0.01);
+    float cross =  opSmoothUnion(h_rect1, h_rect2, 0.07);
+    return unionSDF(head,cross);
+   
+}
+
 float bishop_sdf(vec3 p){
  
     float tip = bishop_tip(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 5.0, BISHOP_POS.z));
@@ -204,6 +233,14 @@ float bishop_sdf(vec3 p){
     float peen = opSmoothUnion(opSmoothUnion(base, shaft,.65),tip,0.5);
     
     return peen;
+}
+
+float king_sdf(vec3 p){
+    float base = bishop_base(p-vec3(KING_POS.x, KING_POS.y + 0.5, KING_POS.z));
+   
+    float shaft = king_shaft(p - vec3(KING_POS.x, KING_POS.y + 1.0, KING_POS.z));
+    float head = king_tip(p-vec3(KING_POS.x, KING_POS.y + 5.5, KING_POS.z));
+    return opSmoothUnion(opSmoothUnion(base, shaft,.65),head,0.5);
 }
 
 float pawn(vec3 p, float base_h, float stem_h,  vec3 offset){
@@ -237,7 +274,8 @@ float scene_sdf(vec3 p){
     vec3 offset = vec3(5.,0.,20.);
     float pawn = pawn(p,0.,3.5, offset);
     float bishop = bishop_sdf(p);
-    float pieces = unionSDF(pawn, bishop);
+    float king = king_sdf(p);
+    float pieces = unionSDF(king, unionSDF(pawn, bishop));
     float plane = floor_sdf(p);
     return min(plane, pieces);
     
@@ -300,7 +338,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 uv = (fragCoord - (0.5) * iResolution.xy)/iResolution.y;
 
-    vec3 cam_pos = vec3(0,1,0);
+    vec3 cam_pos = vec3(0,4,0);
     vec3 cam_dir = vec3(uv.x, uv.y, 1);
     
     float t = ray_march(cam_pos, cam_dir);
