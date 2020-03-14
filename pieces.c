@@ -14,9 +14,18 @@ float sphere_sdf( vec3 p, float r)
   return length(p) - r;
 }
 
+float sphere_sdf( vec3 p, vec3 c, float r)
+{
+  return length(p - c) - r;
+}
+
+float unionSDF(float distA, float distB) {
+    return min(distA, distB);
+}
+
 float floor_sdf(vec3 p){
     vec4 plane = vec4(0, 1, 0, 0);
-	return dot(p, plane.xyz) - plane.w;
+    return dot(p, plane.xyz) - plane.w;
 }
 float rounded_cylinder_sdf( vec3 p, float ra, float rb, float h )
 {
@@ -88,7 +97,7 @@ mat3 rotateZ(float theta) {
 }
 
 vec3 translate(vec3 p, float x, float y, float z){
-	return p + vec3(x, y, z);   
+    return p + vec3(x, y, z);   
 }
 
 
@@ -147,27 +156,91 @@ float bishop_sdf(vec3 p){
     return peen;
 }
 
+float sdRoundedCylinder( vec3 p, float ra, float rb, float h, vec3 offset )
+{
+  p = p-offset;
+  vec2 d = vec2( length(p.xz)-2.0*ra+rb, abs(p.y) - h );
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rb;
+}
 
+
+float sdCappedCylinder( vec3 p, float h, float r, vec3 offset )
+{
+  p = p-offset;
+  vec2 d = abs(vec2(length(p.xz),p.y)) - vec2(h,r);
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+float sdCappedCone(vec3 p, float h, float r1, float r2,vec3 offset)
+{
+  p = p - offset;
+  vec2 q = vec2( length(p.xz), p.y );
+  vec2 k1 = vec2(r2,h);
+  vec2 k2 = vec2(r2-r1,2.0*h);
+  vec2 ca = vec2(q.x-min(q.x,(q.y<0.0)?r1:r2), abs(q.y)-h);
+  vec2 cb = q - k1 + k2*clamp( dot(k1-q,k2)/dot(k2,k2), 0.0, 1.0 );
+  float s = (cb.x<0.0 && ca.y<0.0) ? -1.0 : 1.0;
+  return s*sqrt( min(dot(ca,ca),dot(cb,cb)) );
+}
+
+float sdCone( vec3 p, vec2 c )
+{
+  // c is the sin/cos of the angle
+  float q = length(p.xy);
+  return dot(c,vec2(q,p.z));
+}
+//float opSmoothUnion( float d1, float d2, float k ) {
+    //float h = clamp( 0.5 + 0.5*(d2-d1)/k, 0.0, 1.0 );
+    //return mix( d2, d1, h ) - k*h*(1.0-h); }
+
+float pawn(vec3 p, float base_h, float stem_h,  vec3 offset){
+    float init_base = sdCappedCylinder(p, 1.35,0.3, offset);
+    offset = offset+vec3(0,0.3,0);
+    float rounded_base = sdRoundedCylinder(p,0.7, 0.7, base_h, offset);
+    offset = offset+vec3(0., 0.6, 0.);
+    
+    float flat_base = sdCappedCylinder(p, 1. ,0.1, offset);
+    offset = offset+vec3(0., 0.1, 0.);
+    float rounded_base2 = sdRoundedCylinder(p,0.5, 0.4, base_h, offset);
+    offset = offset+vec3(0,0.25,0);
+    float flat_base2 = sdCappedCylinder(p, 0.95 ,0.1, offset);
+    offset = offset+vec3(0., 0.1, 0.);
+    float base2 = opSmoothUnion(flat_base2, opSmoothUnion(flat_base,rounded_base2,0.1), 0.1);
+
+    float stem  = sdCappedCone(p,stem_h,1.4, 0.25, offset);
+    offset = offset+vec3(0., stem_h, 0.);
+    float head = sphere_sdf(p, offset, 1.);
+    float neck = sdCappedCylinder(p, 1.0,0.05, offset-vec3(0,1.0,0));
+
+    float base = opSmoothUnion(init_base, opSmoothUnion(rounded_base,base2,0.01),0.01);
+    float body = unionSDF(neck, unionSDF(stem,head));
+    return opSmoothUnion( body, base, 0.1);
+    
+    
+}
 
 // Combine all the distance functions for the scene in this function
 float scene_sdf(vec3 p){
+    vec3 offset = vec3(5.,0.,20.);
+    float pawn = pawn(p,0.,3.5, offset);
     float bishop = bishop_sdf(p);
+    float pieces = unionSDF(pawn, bishop);
     float plane = floor_sdf(p);
-    return min(plane, bishop);
+    return min(plane, pieces);
     
 }
 
 
 // Perform ray marching by finding the min distance ray can travel without hitting anything and iterating
 float ray_march(vec3 cam_pos, vec3 cam_dir){
-	float t_near = 0.0;
+    float t_near = 0.0;
     for(int i = 0; i < STEP_MAX; i++){
-    	vec3 p = cam_pos + cam_dir * t_near; // t_near is how far we can go along ray without hitting object
+        vec3 p = cam_pos + cam_dir * t_near; // t_near is how far we can go along ray without hitting object
         float dist = scene_sdf(p);
         t_near += dist;
         // Check if we missed entirely or hit something
         if(t_near > DIST_MAX || dist < EPSILON){
-        	break;  // > DIST_MAX then we missed all objects, less than EPSILON, we hit an object   
+            break;  // > DIST_MAX then we missed all objects, less than EPSILON, we hit an object   
         }
     }
     
@@ -212,7 +285,7 @@ float get_light(vec3 p){
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-	vec2 uv = (fragCoord - (0.5) * iResolution.xy)/iResolution.y;
+    vec2 uv = (fragCoord - (0.5) * iResolution.xy)/iResolution.y;
 
     vec3 cam_pos = vec3(0,1,0);
     vec3 cam_dir = vec3(uv.x, uv.y, 1);
