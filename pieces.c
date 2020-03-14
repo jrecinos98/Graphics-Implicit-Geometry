@@ -117,50 +117,22 @@ float opSmoothIntersection( float d1, float d2, float k ) {
 
 float opUnion( float d1, float d2 ) {  return min(d1,d2); }
 
-
-float bishop_base(vec3 p){
-    float cone = rounded_cylinder_sdf(p, .55,.1,.25);
-    float ring = rounded_cylinder_sdf(p - vec3(0,0.1,0), .25,.003,.08);
-    return opSmoothUnion(cone,ring, 0.2);
-   
-}
-float bishop_shaft(vec3 p){
-    float ring = rounded_cylinder_sdf(p - vec3(0,2.5,0), .35,.005,.1);
-    float ring2 = rounded_cylinder_sdf(p - vec3(0,2.7,0), .25,.003,.08);
-    float ring3 = rounded_cylinder_sdf(p - vec3(0,2.9,0), .2,.001,.06);
-    float shaft_tip = opUnion(opUnion(ring, ring2), ring3);
-   
-    float cone = rounded_cone_sdf(p, .4,.1, 5.);
-    float ring4 = rounded_cylinder_sdf(p - vec3(0,0.4,0), .25,.003,.08);
-    float shaft_base = opUnion(opSmoothUnion(cone, ring4, 0.3), ring4);
-    return opSmoothUnion(shaft_base, shaft_tip,0.5);
-}
-
-float bishop_tip(vec3 p){
-    float sphere = sphere_sdf(p, 0.55);
-    vec3 rot = rotateZ(46.0) * (p - vec3(-0.4,0.2,0));
-    float t_prism = tri_prism_sdf(rot, vec2(0.65,0.5));
-    return opSmoothSubtraction(t_prism,sphere, 0.1);
-    
-}
-
-float bishop_sdf(vec3 p){
- 
-    float tip = bishop_tip(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 5.0, BISHOP_POS.z));
-    
-    float base = bishop_base(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 0.5, BISHOP_POS.z));
-   
-    float shaft = bishop_shaft(p - vec3(BISHOP_POS.x, BISHOP_POS.y + 1.0, BISHOP_POS.z));
-    
-    float peen = opSmoothUnion(opSmoothUnion(base, shaft,.5),tip,0.5);
-    return peen;
-}
+float opSubtraction( float d1, float d2 ) { return max(-d1,d2); }
 
 float sdRoundedCylinder( vec3 p, float ra, float rb, float h, vec3 offset )
 {
   p = p-offset;
   vec2 d = vec2( length(p.xz)-2.0*ra+rb, abs(p.y) - h );
   return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rb;
+}
+float ndot(vec2 a, vec2 b ) { return a.x*b.x - a.y*b.y; }
+float rhombus_sdf(vec3 p, float la, float lb, float h, float ra)
+{
+    p = abs(p);
+    vec2 b = vec2(la,lb);
+    float f = clamp( (ndot(b,b-2.0*p.xz))/dot(b,b), -1.0, 1.0 );
+    vec2 q = vec2(length(p.xz-0.5*b*vec2(1.0-f,1.0+f))*sign(p.x*b.y+p.z*b.x-b.x*b.y)-ra, p.y-h);
+    return min(max(q.x,q.y),0.0) + length(max(q,0.0));
 }
 
 
@@ -193,8 +165,51 @@ float sdCone( vec3 p, vec2 c )
     //float h = clamp( 0.5 + 0.5*(d2-d1)/k, 0.0, 1.0 );
     //return mix( d2, d1, h ) - k*h*(1.0-h); }
 
+
+float bishop_base(vec3 p){
+    float base = rounded_cylinder_sdf(p, .55, .15, .15);
+    float ring = rounded_cylinder_sdf(p - vec3(0,0.1,0), .25,.003,.08);
+    return base;
+   
+}
+float bishop_shaft(vec3 p){
+    float ring = rounded_cylinder_sdf(p - vec3(0,2.5,0), .35,.005,.1);
+    float ring2 = rounded_cylinder_sdf(p - vec3(0,2.7,0), .25,.003,.08);
+    float ring3 = rounded_cylinder_sdf(p - vec3(0,2.9,0), .2,.001,.06);
+    float shaft_tip = opUnion(opUnion(ring, ring2), ring3);   
+    
+    float cone = rounded_cone_sdf(p, .4,.1, 3.5);
+    float ring4 = rounded_cylinder_sdf(p - vec3(0,0.4,0), .25,.003,.08);
+    float shaft_base = opUnion(opSmoothUnion(cone, ring4, 0.3), ring4);
+    return opSmoothUnion(shaft_base, shaft_tip,0.5);
+}
+
+float bishop_tip(vec3 p){
+    float big_sphere = sphere_sdf(p, 0.50);
+    float top_sphere = sphere_sdf(p - vec3(0,0.65,0),0.25);
+    float spheres = opSmoothUnion(big_sphere, top_sphere, 0.1);
+    vec3 rot = rotateZ(40.0) * (p - vec3(-0.55,0.35,0));
+    float rhombus = rhombus_sdf(rot,0.5, 0.5, 0.08,0.4);
+    //float t_prism = tri_prism_sdf(rot, vec2(0.55,0.5));
+    return opSubtraction(rhombus,spheres);
+    
+}
+
+float bishop_sdf(vec3 p){
+ 
+    float tip = bishop_tip(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 5.0, BISHOP_POS.z));
+    
+    float base = bishop_base(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 0.5, BISHOP_POS.z));
+   
+    float shaft = bishop_shaft(p - vec3(BISHOP_POS.x, BISHOP_POS.y + 1.0, BISHOP_POS.z));
+    
+    float peen = opSmoothUnion(opSmoothUnion(base, shaft,.65),tip,0.5);
+    
+    return peen;
+}
+
 float pawn(vec3 p, float base_h, float stem_h,  vec3 offset){
-    float init_base = sdCappedCylinder(p, 1.35,0.3, offset);
+    float init_base = sdCappedCylinder(p, 1.2,0.3, offset);
     offset = offset+vec3(0,0.3,0);
     float rounded_base = sdRoundedCylinder(p,0.7, 0.7, base_h, offset);
     offset = offset+vec3(0., 0.6, 0.);
