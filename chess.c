@@ -1,3 +1,4 @@
+ 
 // Making chess pieces using raymarching and constructive solid geometry
 // Copy + paste all of this code into shadertoy and run it
 
@@ -72,6 +73,7 @@ float rounded_cone_sdf( vec3 p, float r1, float r2, float h )
         
   return dot(q, vec2(a,b) ) - r1;
 }
+
 
 /**
  * Rotation matrix around the X axis.
@@ -171,6 +173,11 @@ float sdCappedCone(vec3 p, float h, float r1, float r2,vec3 offset)
   float s = (cb.x<0.0 && ca.y<0.0) ? -1.0 : 1.0;
   return s*sqrt( min(dot(ca,ca),dot(cb,cb)) );
 }
+float sdRoundBox( vec3 p, vec3 b, float r )
+{
+  vec3 q = abs(p) - b;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+}
 
 float sdCone( vec3 p, vec2 c )
 {
@@ -180,7 +187,7 @@ float sdCone( vec3 p, vec2 c )
 }
 
 float bishop_base(vec3 p){
-    float base = rounded_cylinder_sdf(p, .55, .15, .15);
+    float base = rounded_cylinder_sdf(p, .45, .08, .18);
     float ring = rounded_cylinder_sdf(p - vec3(0,0.1,0), .25,.003,.08);
     return base;
    
@@ -208,7 +215,9 @@ float bishop_tip(vec3 p){
     
 }
 
-vec2 bishop_sdf(vec3 p, vec3 BISHOP_POS, float color){
+vec2 bishop_sdf(vec3 point, vec3 offset, float color, float scale){
+    vec3 p = point/scale;
+    vec3 BISHOP_POS = offset/scale;
  
     float tip = bishop_tip(p-vec3(BISHOP_POS.x, BISHOP_POS.y + 5.0, BISHOP_POS.z));
     
@@ -218,19 +227,76 @@ vec2 bishop_sdf(vec3 p, vec3 BISHOP_POS, float color){
     
     float peen = opSmoothUnion(opSmoothUnion(base, shaft,.65),tip,0.5);
     
-    return vec2(peen, color);
+    return vec2(peen*scale, color);
 }
+
+vec2 pawn(vec3 point, float base_h, float stem_h,  vec3 off, float color, float scale){
+    vec3 p = point/scale;
+    vec3 offset = off/scale;
+    float init_base = sdCappedCylinder(p, 1.2,0.3, offset);
+    offset = offset+vec3(0,0.3,0);
+    float rounded_base = sdRoundedCylinder(p,0.7, 0.7, base_h, offset);
+    offset = offset+vec3(0., 0.6, 0.);
+    
+    float flat_base = sdCappedCylinder(p, 1. ,0.1, offset);
+    offset = offset+vec3(0., 0.1, 0.);
+    float rounded_base2 = sdRoundedCylinder(p,0.5, 0.4, base_h, offset);
+    offset = offset+vec3(0,0.25,0);
+    float flat_base2 = sdCappedCylinder(p, 0.95 ,0.1, offset);
+    offset = offset+vec3(0., 0.1, 0.);
+    float base2 = opSmoothUnion(flat_base2, opSmoothUnion(flat_base,rounded_base2,0.1), 0.1);
+
+    float stem  = sdCappedCone(p,stem_h,1.2, 0.25, offset);
+    offset = offset+vec3(0., stem_h, 0.);
+    float head = sphere_sdf(p, offset, 1.);
+    float neck = sdCappedCylinder(p, 1.0,0.05, offset-vec3(0,1.0,0));
+
+    float base = opSmoothUnion(init_base, opSmoothUnion(rounded_base,base2,0.01),0.01);
+    float body = opUnion(neck, opUnion(stem,head));
+    return vec2(opSmoothUnion( body, base, 0.1)*scale, color);     
+}
+float king_shaft(vec3 p){
+    float ring = rounded_cylinder_sdf(p - vec3(0,3.1,0), .35,.005,.1);
+    float ring2 = rounded_cylinder_sdf(p - vec3(0,3.3,0), .25,.003,.08);
+    float ring3 = rounded_cylinder_sdf(p - vec3(0,3.5,0), .2,.003,.06);
+    float shaft_tip = opUnion(opUnion(ring, ring2), ring3);   
+    
+    float cone = rounded_cone_sdf(p, .4,.07, 4.5);
+    float ring4 = rounded_cylinder_sdf(p - vec3(0,0.4,0), .20,.003,.08);
+    float shaft_base = opUnion(opSmoothUnion(cone, ring4, 0.3), ring4);
+    return opSmoothUnion(shaft_base, shaft_tip,0.5);
+}
+
+float king_tip(vec3 p){
+    float head = sdCappedCone(p,0.5, 0.1,0.55,vec3(0.,0.,0.));
+    float h_rect1 = sdRoundBox(p-vec3(0.,0.8,0.), vec3(0.1,0.4,0.05),0.01);
+    float h_rect2 = sdRoundBox(p-vec3(0., 0.9,0.), vec3(0.3,0.1,0.05),0.01);
+    float cross =  opSmoothUnion(h_rect1, h_rect2, 0.07);
+    return opUnion(head,cross);
+   
+}
+
+vec2 king_sdf(vec3 point,vec3 offset, float color, float scale){
+    vec3 p = point/scale;
+    vec3 KING_POS = offset/scale;
+    float base = bishop_base(p-vec3(KING_POS.x, KING_POS.y + 0.5, KING_POS.z));
+   
+    float shaft = king_shaft(p - vec3(KING_POS.x, KING_POS.y + 1.0, KING_POS.z));
+    float head = king_tip(p-vec3(KING_POS.x, KING_POS.y + 5.5, KING_POS.z));
+    return vec2(opSmoothUnion(opSmoothUnion(base, shaft,.65)*scale,head,0.5), color);
+}
+
 
 // Combine all the distance functions for the scene in this function
 vec2 scene_sdf(vec3 p){
-    vec2 curr = bishop_sdf(p, vec3(0,0,7), BLACK);
-    vec2 bishop2 = bishop_sdf(p, vec3(3,0, 5), WHITE);
-    vec2 bishop3 = bishop_sdf(p, vec3(-3, 0, 5), WHITE);
+    vec2 curr = bishop_sdf(p, vec3(0,0,7), BLACK, 0.35);
+    vec2 pawn = pawn(p, 0.009 , 3.50, vec3(3,-0.0009, 7), WHITE, 0.2);
+    vec2 king = king_sdf(p, vec3(-3, 0, 6), WHITE, 0.4);
     vec2 plane = vec2(floor_sdf(p), 2); 
     vec2 wall = vec2(wall_sdf(p), 2);
     
-    curr = opUnionVec2(curr, bishop2);
-    curr = opUnionVec2(curr, bishop3);
+    curr = opUnionVec2(curr, pawn);
+    curr = opUnionVec2(curr, king);
     curr = opUnionVec2(curr, plane);
     curr = opUnionVec2(curr, wall);
     
@@ -301,15 +367,7 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     vec3 half_vec_l2 = (l2_dir + v) / (length(l2_dir + v));
     //half_vec_l1 = normalize(half_vec_l1);
     half_vec_l2 = normalize(half_vec_l2);
-    
-    //float ndotl1 = dot(norm, l1_dir);  // Calculate diffuse color intensity as dot product of light direction and surface normal
-    //ndotl1 = clamp(ndotl1, 0.0, 1.0);
-    
-    //float shadow = ray_march(p + norm * EPSILON * 2., l1_dir).x;  // MUST ADD Epsilon to ensure don't accidently hit the floor
-    //if(shadow < length(l1 - p) && shadow != -1.){  // Hit something between light and point so we're in a shadow
-    //  l1_intensity = .2 * l1_intensity;
-    //}
-    //color += kd * (ndotl1 * (l1_intensity * decay_l1));
+
     
     
     float ndotl2 = dot(norm, l2_dir);  // Calculating dot for second light
