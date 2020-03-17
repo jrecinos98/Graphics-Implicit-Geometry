@@ -107,8 +107,8 @@ vec3 normal_at(vec3 p){
 
 // Add simple point lights to illuminate the scene
 vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
-    vec3 l1_intensity = vec3(.1,.7,.1) * 4.;
-    vec3 l1 = vec3(0, 7, 8);
+    vec3 l1_intensity = vec3(.1,.9,.1) * 4.;
+    vec3 l1 = vec3(0, 7, 7);
     vec3 l1_dir = normalize(l1 - p);  // Direction vector from the point to light
     float decay_l1 = (1. / length(p - l1));
     
@@ -116,6 +116,11 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     vec3 l2 = vec3(-2, .5, 4.);
     vec3 l2_dir = normalize(l2 - p);  // Direction vector from the point to light
     float decay_l2 = (1. / length(p - l2));
+    
+    vec3 l3_intensity = vec3(.1,.1,.9) * 4.;
+    vec3 l3 = vec3(2, .5, 4.);
+    vec3 l3_dir = normalize(l3 - p);  // Direction vector from the point to light
+    float decay_l3 = (1. / length(p - l3));
     vec3 l_a = vec3(0.1);
     
     float p_s = 30.;
@@ -132,15 +137,17 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     
     vec3 half_vec_l1 = (l1_dir + v) / (length(l1_dir + v));
     vec3 half_vec_l2 = (l2_dir + v) / (length(l2_dir + v));
+    vec3 half_vec_l3 = (l3_dir + v) / (length(l3_dir + v));
     half_vec_l1 = normalize(half_vec_l1);
     half_vec_l2 = normalize(half_vec_l2);
+    half_vec_l3 = normalize(half_vec_l3);
     
     float ndotl1 = dot(norm, l1_dir);  // Calculate diffuse color intensity as dot product of light direction and surface normal
     ndotl1 = clamp(ndotl1, 0.0, 1.0);
     
     float shadow = ray_march(p + norm * EPSILON * 2., l1_dir).x;  // MUST ADD Epsilon to ensure don't accidently hit the floor
     if(shadow < length(l1 - p) && shadow != -1.){  // Hit something between light and point so we're in a shadow
-        l1_intensity = .2 * l1_intensity;
+        l1_intensity = .1 * l1_intensity;
     }
     color += kd * (ndotl1 * (l1_intensity * decay_l1));
     
@@ -152,9 +159,20 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     if(shadow < length(l2 - p) && shadow != -1.){  // Hit something between light and point so we're in a shadow
         l2_intensity *= .1;
     }
+    
+    float ndotl3 = dot(norm, l3_dir);
+    ndotl3 = clamp(ndotl3, 0.0, 1.0);
+    
+    shadow = ray_march(p + norm * EPSILON * 2., l3_dir).x;
+    if(shadow < length(l3 - p) && shadow != -1.){
+        l3_intensity *= .1;   
+    }
+        
     color += kd * (ndotl2 * l2_intensity * decay_l2);
+    color += kd * (ndotl3 * l3_intensity * decay_l3);
     vec3 spec = pow(dot(half_vec_l1, norm),p_s) * ks * (l1_intensity * decay_l1);
     spec += pow(dot(half_vec_l2, norm), p_s) * ks * (l2_intensity * decay_l2);
+    spec += pow(dot(half_vec_l3, norm), p_s) * ks * (l3_intensity * decay_l3);
     return color + l_a + spec;
 }
 
