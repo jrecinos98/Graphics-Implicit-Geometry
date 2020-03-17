@@ -4,8 +4,8 @@
 
 // Defines
 #define STEP_MAX 100
-#define DIST_MAX 10.0
-#define EPSILON 0.03
+#define DIST_MAX 9.0
+#define EPSILON 0.01
 
 #define WHITE 0.
 #define BLACK 1.
@@ -51,7 +51,7 @@ float floor_sdf(vec3 p){
 }
 
 float wall_sdf(vec3 p){
-    vec4 plane = vec4(0, 0, -1, -10);
+    vec4 plane = vec4(0, 0, -1, -9.0);
     return dot(p, plane.xyz) - plane.w;
 }
 
@@ -73,6 +73,7 @@ float rounded_cone_sdf( vec3 p, float r1, float r2, float h )
         
   return dot(q, vec2(a,b) ) - r1;
 }
+
 
 
 /**
@@ -283,15 +284,15 @@ vec2 king_sdf(vec3 point,vec3 offset, float color, float scale){
    
     float shaft = king_shaft(p - vec3(KING_POS.x, KING_POS.y + 1.0, KING_POS.z));
     float head = king_tip(p-vec3(KING_POS.x, KING_POS.y + 5.5, KING_POS.z));
-    return vec2(opSmoothUnion(opSmoothUnion(base, shaft,.65)*scale,head,0.5), color);
+    return vec2(opSmoothUnion(opSmoothUnion(base, shaft,.65),head,0.5)*scale, color);
 }
 
 
 // Combine all the distance functions for the scene in this function
 vec2 scene_sdf(vec3 p){
-    vec2 curr = bishop_sdf(p, vec3(0,0,7), BLACK, 0.35);
-    vec2 pawn = pawn(p, 0.009 , 3.50, vec3(3,-0.0009, 7), WHITE, 0.2);
-    vec2 king = king_sdf(p, vec3(-3, 0, 6), WHITE, 0.4);
+    vec2 curr = bishop_sdf(p, vec3(-2.,0,6), WHITE, 0.35);
+    vec2 pawn = pawn(p, 0.009 , 3.50, vec3(2.,-0.0009, 6), WHITE, 0.2);
+    vec2 king = king_sdf(p, vec3(0, 0, 6), BLACK, 0.4);
     vec2 plane = vec2(floor_sdf(p), 2); 
     vec2 wall = vec2(wall_sdf(p), 2);
     
@@ -340,14 +341,10 @@ vec3 normal_at(vec3 p){
 
 // Add simple point lights to illuminate the scene
 vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
-//    vec3 l1_intensity = vec3(1.,.9,.8) * 4.;
-//    vec3 l1 = vec3(0, 9, 15);
-//    vec3 l1_dir = normalize(l1 - p);  // Direction vector from the point to light
-//    float decay_l1 = (1. / length(p - l1));
-    
-    vec3 l2_intensity = vec3(1.,.9,.8) * 4.;
-    vec3 l2 = vec3(-1, 7, 5.);
+    vec3 l2_intensity = vec3(1.,.9,.8) * 2.;
+    vec3 l2 = vec3(-1.5, 3, 4.);
     vec3 l2_dir = normalize(l2 - p);  // Direction vector from the point to light
+    l2_dir.x = sin(iTime);
     float decay_l2 = (1. / length(p - l2));
     vec3 l_a = vec3(0.1);
     
@@ -365,7 +362,6 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     
     //vec3 half_vec_l1 = (l1_dir + v) / (length(l1_dir + v));
     vec3 half_vec_l2 = (l2_dir + v) / (length(l2_dir + v));
-    //half_vec_l1 = normalize(half_vec_l1);
     half_vec_l2 = normalize(half_vec_l2);
 
     
