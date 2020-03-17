@@ -27,7 +27,7 @@ vec3 get_color(float key){
 // Get material for phong reflectance 
 vec3 get_mat(float key){
     if(key == WHITE || key == BLACK){
-    	return vec3(.8);
+        return vec3(.8);
     }else{
         return vec3(.05);
     }
@@ -42,16 +42,16 @@ float sphere_sdf( vec3 p, vec3 c, float r)
 // Distance function for the floor
 float floor_sdf(vec3 p){
     vec4 plane = vec4(0, 1, 0, 0);
-	return dot(p, plane.xyz) - plane.w;
+    return dot(p, plane.xyz) - plane.w;
 }
 
 float wall_sdf(vec3 p){
-	vec4 plane = vec4(0, 0, -1, -10);
+    vec4 plane = vec4(0, 0, -1, -10);
     return dot(p, plane.xyz) - plane.w;
 }
 
 vec2 black_sphere_sdf(vec3 p, vec3 c, float r){
-	return vec2(sphere_sdf(p, c, r), WHITE);   
+    return vec2(sphere_sdf(p, c, r), WHITE);   
 }
 
 // Combine all the distance functions for the scene in this function
@@ -61,9 +61,9 @@ vec2 scene_sdf(vec3 p){
     vec2 wall = vec2(wall_sdf(p), 2);
     
     if(plane.x < curr.x){
-    	curr = plane;   
+        curr = plane;   
     }
-   	
+    
     if(wall.x < curr.x){
         curr = wall;
     }
@@ -73,9 +73,9 @@ vec2 scene_sdf(vec3 p){
 
 // Perform ray marching by finding the min distance ray can travel without hitting anything and iterating
 vec2 ray_march(vec3 cam_pos, vec3 cam_dir){
-	float t_near = 0.0;
+    float t_near = 0.0;
     for(int i = 0; i < STEP_MAX; i++){
-    	vec3 p = cam_pos + cam_dir * t_near; // t_near is how far we can go along ray without hitting object
+        vec3 p = cam_pos + cam_dir * t_near; // t_near is how far we can go along ray without hitting object
         vec2 dist = scene_sdf(p);
         t_near += dist.x;
         // Check if we missed entirely or hit something
@@ -83,7 +83,7 @@ vec2 ray_march(vec3 cam_pos, vec3 cam_dir){
         if(t_near > DIST_MAX){ 
             return vec2(-1., -1);
         }else if(dist.x < EPSILON){
-         	return vec2(t_near, dist.y); 
+            return vec2(t_near, dist.y); 
         }
     }
     
@@ -107,12 +107,12 @@ vec3 normal_at(vec3 p){
 
 // Add simple point lights to illuminate the scene
 vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
-    vec3 l1_intensity = vec3(1.,.9,.8) * 4.;
+    vec3 l1_intensity = vec3(.1,.7,.1) * 4.;
     vec3 l1 = vec3(0, 7, 8);
     vec3 l1_dir = normalize(l1 - p);  // Direction vector from the point to light
     float decay_l1 = (1. / length(p - l1));
     
-    vec3 l2_intensity = vec3(1.,.9,.8) * 4.;
+    vec3 l2_intensity = vec3(.9,.1,.1) * 4.;
     vec3 l2 = vec3(-2, .5, 4.);
     vec3 l2_dir = normalize(l2 - p);  // Direction vector from the point to light
     float decay_l2 = (1. / length(p - l2));
@@ -140,7 +140,7 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     
     float shadow = ray_march(p + norm * EPSILON * 2., l1_dir).x;  // MUST ADD Epsilon to ensure don't accidently hit the floor
     if(shadow < length(l1 - p) && shadow != -1.){  // Hit something between light and point so we're in a shadow
-    	l1_intensity = .2 * l1_intensity;
+        l1_intensity = .2 * l1_intensity;
     }
     color += kd * (ndotl1 * (l1_intensity * decay_l1));
     
@@ -150,7 +150,7 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
     
     shadow = ray_march(p + norm * EPSILON * 2., l2_dir).x;  // MUST ADD Epsilon to ensure don't accidently hit the floor
     if(shadow < length(l2 - p) && shadow != -1.){  // Hit something between light and point so we're in a shadow
-    	l2_intensity *= .1;
+        l2_intensity *= .1;
     }
     color += kd * (ndotl2 * l2_intensity * decay_l2);
     vec3 spec = pow(dot(half_vec_l1, norm),p_s) * ks * (l1_intensity * decay_l1);
@@ -161,7 +161,7 @@ vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-	vec2 uv = (fragCoord - (0.5) * iResolution.xy)/iResolution.y;
+    vec2 uv = (fragCoord - (0.5) * iResolution.xy)/iResolution.y;
 
     vec3 cam_pos = vec3(0,1,0);
     vec3 cam_dir = vec3(uv.x, uv.y, 1);
