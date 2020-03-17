@@ -4,7 +4,7 @@
 
 // Defines
 #define STEP_MAX 100
-#define DIST_MAX 9.0
+#define DIST_MAX 10.0
 #define EPSILON 0.01
 
 #define WHITE 0.
@@ -18,9 +18,9 @@ vec3 get_color(float key){
     } else if(key == BLACK){
         return vec3(.25, .25, .25);
     } else if(key == FLOOR){
-        return vec3(.3,.3,.3);   
+        return vec3(.4,.4,.4);   
     } else{
-        return vec3(.4, .2, .2);
+        return vec3(.6, .8, .9);
     }
 }
 
@@ -290,16 +290,21 @@ vec2 king_sdf(vec3 point,vec3 offset, float color, float scale){
 
 // Combine all the distance functions for the scene in this function
 vec2 scene_sdf(vec3 p){
-    vec2 curr = bishop_sdf(p, vec3(-2.,0,6), WHITE, 0.35);
-    vec2 pawn = pawn(p, 0.009 , 3.50, vec3(2.,-0.0009, 6), WHITE, 0.2);
-    vec2 king = king_sdf(p, vec3(0, 0, 6), BLACK, 0.4);
+    vec2 curr = bishop_sdf(p, vec3(-2.,0,5), WHITE, 0.35);
+    vec2 bishop_1 = bishop_sdf(p, vec3(2.,0,5), WHITE, 0.35);
+    vec2 pawn_1 = pawn(p, 0.009 , 3.50, vec3(-4.,-0.0009, 6), BLACK, 0.2);
+    vec2 king = king_sdf(p, vec3(0, 0, 4.5), BLACK, 0.4);
     vec2 plane = vec2(floor_sdf(p), 2); 
-    vec2 wall = vec2(wall_sdf(p), 2);
+    vec2 pawn_2 = pawn(p, 0.009 , 3.50, vec3(4.,-0.0009, 6), BLACK, 0.2);
+    //vec2 wall = vec2(wall_sdf(p), 2);
     
-    curr = opUnionVec2(curr, pawn);
+    
+    curr = opUnionVec2(curr, pawn_1);
+    curr = opUnionVec2(curr, pawn_2);
+    curr = opUnionVec2(curr, bishop_1);
     curr = opUnionVec2(curr, king);
     curr = opUnionVec2(curr, plane);
-    curr = opUnionVec2(curr, wall);
+    //curr = opUnionVec2(curr, wall);
     
     return curr;
 }
@@ -341,8 +346,8 @@ vec3 normal_at(vec3 p){
 
 // Add simple point lights to illuminate the scene
 vec3 get_light(vec3 p, vec3 color, vec3 mat, vec3 cam_pos){
-    vec3 l2_intensity = vec3(1.,.9,.8) * 2.;
-    vec3 l2 = vec3(-1.5, 3, 4.);
+    vec3 l2_intensity = vec3(1.,.9,.8) * 2.0;
+    vec3 l2 = vec3(0, 3, 3.5);
     vec3 l2_dir = normalize(l2 - p);  // Direction vector from the point to light
     l2_dir.x = sin(iTime);
     float decay_l2 = (1. / length(p - l2));
