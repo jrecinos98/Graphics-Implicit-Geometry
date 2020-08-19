@@ -1,5 +1,5 @@
 # cs180_final_proj
-CS180 final proj chess pieces
+CS180 final proj chess pieces: https://www.youtube.com/watch?v=R8fvsNkRMjQ
 
 Implicit Gemoetry Project
 Description: https://docs.google.com/document/d/1J4av5QrcKOUGcVIXc7dPuCedPJ6_tIFAKkQzDUMWGXI/edit#heading=h.s03m5dcpbyv7
